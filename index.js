@@ -3,12 +3,21 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { createCanvas } = require('canvas');
 const Chart = require('chart.js/auto');
+const path = require('path');
 
 // Create an Express app
 const app = express();
 
 // Middleware to parse JSON requests
 app.use(bodyParser.json());
+
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// GET route for the root URL
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // POST endpoint to generate a graph
 app.post('/generate-graph', (req, res) => {

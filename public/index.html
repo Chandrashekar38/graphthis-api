@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GraphThis API</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    form {
+      margin-top: 20px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, select, button {
+      padding: 8px;
+      margin-bottom: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+    #graphContainer {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to GraphThis API</h1>
+  <p>Use the form below to generate a graph.</p>
+
+  <form id="graphForm">
+    <label for="labels">Labels (comma-separated):</label>
+    <input type="text" id="labels" name="labels" value="January,February,March" required>
+
+    <label for="data">Data (comma-separated):</label>
+    <input type="text" id="data" name="data" value="10,20,30" required>
+
+    <label for="type">Chart Type:</label>
+    <select id="type" name="type">
+      <option value="line">Line</option>
+      <option value="bar">Bar</option>
+      <option value="pie">Pie</option>
+    </select>
+
+    <button type="submit">Generate Graph</button>
+  </form>
+
+  <div id="graphContainer"></div>
+
+  <script>
+    document.getElementById('graphForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const labels = document.getElementById('labels').value.split(',');
+      const data = document.getElementById('data').value.split(',').map(Number);
+      const type = document.getElementById('type').value;
+
+      try {
+        const response = await fetch('/generate-graph', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ labels, data, type }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate graph');
+        }
+
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        document.getElementById('graphContainer').innerHTML = '';
+        document.getElementById('graphContainer').appendChild(img);
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to generate graph. Please check the console for details.');
+      }
+    });
+  </script>
+</body>
+</html>

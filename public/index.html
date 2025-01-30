@@ -44,7 +44,7 @@
   <p>Enter data in any format (CSV, JSON, Key-Value Pairs) or upload a file.</p>
   <form id="graphForm">
     <label for="data">Enter Data:</label>
-    <textarea id="data" name="data" rows="4" placeholder='e.g., "Jan 120, Feb 150" or {"Jan": 120, "Feb": 150}' required></textarea>
+    <textarea id="data" name="data" rows="4" placeholder='e.g., "Jan 120, Feb 150" or {"Jan": 120, "Feb": 150}'></textarea>
     <label for="fileInput">Or Upload a File:</label>
     <input type="file" id="fileInput" accept=".csv,.json,.txt">
     <label for="type">Chart Type:</label>
@@ -80,9 +80,8 @@
       const fileInput = document.getElementById('fileInput').files[0];
       const type = document.getElementById('type').value;
 
-      let rawData = inputData; // Default to text input
+      let rawData = null;
 
-      // If a file is uploaded, read its content
       if (fileInput) {
         const reader = new FileReader();
         rawData = await new Promise((resolve, reject) => {
@@ -90,6 +89,8 @@
           reader.onerror = () => reject(reader.error);
           reader.readAsText(fileInput);
         });
+      } else {
+        rawData = inputData;
       }
 
       try {
@@ -109,14 +110,12 @@
         const blob = await response.blob();
         imageUrl = URL.createObjectURL(blob);
 
-        // Display the graph
         const img = document.createElement('img');
         img.id = 'graphImage';
         img.src = imageUrl;
         document.getElementById('graphContainer').innerHTML = '';
         document.getElementById('graphContainer').appendChild(img);
 
-        // Show the download button
         document.getElementById('downloadButton').style.display = 'block';
       } catch (error) {
         console.error('Error:', error);

@@ -8,7 +8,8 @@ const fs = require('fs');
 const util = require('util');
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.text({ type: 'text/*', limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Helper function to parse unstructured data
@@ -17,10 +18,14 @@ function parseUnstructuredData(input) {
   const labels = [];
   const data = [];
   pairs.forEach(pair => {
-    const [label, value] = pair.split(/\s+/); // Split by whitespace
-    if (label && !isNaN(value)) {
-      labels.push(label);
-      data.push(Number(value));
+    const keyValue = pair.split(/\s+/); // Split by whitespace
+    if (keyValue.length === 2) {
+      const label = keyValue[0];
+      const value = parseFloat(keyValue[1]);
+      if (!isNaN(value)) {
+        labels.push(label);
+        data.push(value);
+      }
     }
   });
   return { labels, data };
@@ -52,7 +57,7 @@ async function parseCSVData(input) {
         const keys = Object.keys(row);
         if (keys.length === 2) {
           labels.push(row[keys[0]]);
-          data.push(Number(row[keys[1]]));
+          data.push(parseFloat(row[keys[1]]));
         }
       })
       .on('end', () => resolve({ labels, data }))

@@ -24,27 +24,28 @@
       display: block;
       margin: 10px 0 5px;
     }
-    input, select, button {
+    textarea, input, select, button {
       padding: 8px;
       margin-bottom: 10px;
       width: 100%;
-      max-width: 300px;
+      max-width: 500px;
     }
     #graphContainer {
       margin-top: 20px;
+    }
+    #downloadButton {
+      display: none; /* Hidden by default */
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
   <h1>Welcome to GraphThis API</h1>
-  <p>Use the form below to generate a graph.</p>
+  <p>Enter unstructured data (e.g., "January 10, February 20, March 30") to generate a graph.</p>
 
   <form id="graphForm">
-    <label for="labels">Labels (comma-separated):</label>
-    <input type="text" id="labels" name="labels" value="January,February,March" required>
-
-    <label for="data">Data (comma-separated):</label>
-    <input type="text" id="data" name="data" value="10,20,30" required>
+    <label for="data">Enter Data:</label>
+    <textarea id="data" name="data" rows="4" placeholder="e.g., January 10, February 20, March 30" required></textarea>
 
     <label for="type">Chart Type:</label>
     <select id="type" name="type">
@@ -57,14 +58,54 @@
   </form>
 
   <div id="graphContainer"></div>
+  <button id="downloadButton" onclick="downloadGraph()">Download Graph</button>
 
   <script>
+    let imageUrl = null; // To store the generated graph image URL
+
+    // Function to parse unstructured data into labels and data
+    function parseUnstructuredData(input) {
+      const pairs = input.split(',').map(pair => pair.trim());
+      const labels = [];
+      const data = [];
+
+      pairs.forEach(pair => {
+        const [label, value] = pair.split(/\s+/); // Split by whitespace
+        if (label && !isNaN(value)) {
+          labels.push(label);
+          data.push(Number(value));
+        }
+      });
+
+      return { labels, data };
+    }
+
+    // Function to download the graph
+    function downloadGraph() {
+      if (imageUrl) {
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = 'graph.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    }
+
+    // Handle form submission
     document.getElementById('graphForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const labels = document.getElementById('labels').value.split(',');
-      const data = document.getElementById('data').value.split(',').map(Number);
+      const inputData = document.getElementById('data').value;
       const type = document.getElementById('type').value;
+
+      // Parse unstructured data
+      const { labels, data } = parseUnstructuredData(inputData);
+
+      if (labels.length === 0 || data.length === 0) {
+        alert('Invalid input. Please enter data in the format "Label Value, Label Value, ..."');
+        return;
+      }
 
       try {
         const response = await fetch('/generate-graph', {
@@ -76,18 +117,24 @@
         });
 
         if (!response.ok) {
-          throw new Error('Failed to generate graph');
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to generate graph');
         }
 
         const blob = await response.blob();
-        const imageUrl = URL.createObjectURL(blob);
+        imageUrl = URL.createObjectURL(blob);
+
+        // Display the graph
         const img = document.createElement('img');
         img.src = imageUrl;
         document.getElementById('graphContainer').innerHTML = '';
         document.getElementById('graphContainer').appendChild(img);
+
+        // Show the download button
+        document.getElementById('downloadButton').style.display = 'block';
       } catch (error) {
         console.error('Error:', error);
-        alert('Failed to generate graph. Please check the console for details.');
+        alert(error.message || 'Failed to generate graph. Please check the console for details.');
       }
     });
   </script>

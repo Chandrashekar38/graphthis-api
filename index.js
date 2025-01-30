@@ -1,32 +1,95 @@
-// Import required modules
 const express = require('express');
 const bodyParser = require('body-parser');
 const { createCanvas } = require('canvas');
 const Chart = require('chart.js/auto');
 const path = require('path');
+const csvParser = require('csv-parser');
+const fs = require('fs');
+const util = require('util');
 
-// Create an Express app
 const app = express();
-
-// Middleware to parse JSON requests
 app.use(bodyParser.json());
-
-// Serve static files from the "public" directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// GET route for the root URL
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Helper function to parse unstructured data
+function parseUnstructuredData(input) {
+  const pairs = input.split(',').map(pair => pair.trim());
+  const labels = [];
+  const data = [];
+  pairs.forEach(pair => {
+    const [label, value] = pair.split(/\s+/); // Split by whitespace
+    if (label && !isNaN(value)) {
+      labels.push(label);
+      data.push(Number(value));
+    }
+  });
+  return { labels, data };
+}
+
+// Helper function to parse JSON data
+function parseJSONData(input) {
+  try {
+    const jsonData = JSON.parse(input);
+    const labels = Object.keys(jsonData);
+    const data = Object.values(jsonData).map(Number);
+    return { labels, data };
+  } catch (error) {
+    return null;
+  }
+}
+
+// Helper function to parse CSV data
+async function parseCSVData(input) {
+  return new Promise((resolve, reject) => {
+    const labels = [];
+    const data = [];
+    const stream = require('stream');
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(Buffer.from(input));
+    bufferStream
+      .pipe(csvParser())
+      .on('data', (row) => {
+        const keys = Object.keys(row);
+        if (keys.length === 2) {
+          labels.push(row[keys[0]]);
+          data.push(Number(row[keys[1]]));
+        }
+      })
+      .on('end', () => resolve({ labels, data }))
+      .on('error', (err) => reject(err));
+  });
+}
 
 // POST endpoint to generate a graph
-app.post('/generate-graph', (req, res) => {
-  const { labels, data, type = 'line' } = req.body;
+app.post('/generate-graph', async (req, res) => {
+  const { data: rawData, type = 'line' } = req.body;
 
-  // Validate input
-  if (!labels || !data) {
-    return res.status(400).json({ error: 'Labels and data are required.' });
+  if (!rawData) {
+    return res.status(400).json({ error: 'Data is required.' });
   }
+
+  let parsedData = null;
+
+  // Try parsing as JSON
+  parsedData = parseJSONData(rawData);
+  if (parsedData) {
+    console.log('Parsed as JSON');
+  } else {
+    // Try parsing as CSV
+    try {
+      parsedData = await parseCSVData(rawData);
+      console.log('Parsed as CSV');
+    } catch (csvError) {
+      // Try parsing as unstructured data
+      parsedData = parseUnstructuredData(rawData);
+      if (!parsedData.labels || !parsedData.data) {
+        return res.status(400).json({ error: 'Invalid data format. Supported formats: JSON, CSV, or Key-Value Pairs.' });
+      }
+      console.log('Parsed as Unstructured Data');
+    }
+  }
+
+  const { labels, data } = parsedData;
 
   // Create a canvas for the chart
   const canvas = createCanvas(800, 400);
@@ -35,21 +98,29 @@ app.post('/generate-graph', (req, res) => {
   try {
     // Generate the chart using Chart.js
     new Chart(ctx, {
-      type: type, // Chart type (line, bar, pie, etc.)
+      type,
       data: {
-        labels: labels, // X-axis labels
+        labels,
         datasets: [{
-          label: 'Data', // Dataset label
-          data: data, // Y-axis data
-          backgroundColor: 'rgba(75, 192, 192, 0.2)', // Chart color
-          borderColor: 'rgba(75, 192, 192, 1)', // Border color
-          borderWidth: 2, // Border width
+          label: 'Data',
+          data,
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 2,
         }],
       },
       options: {
         scales: {
           y: {
-            beginAtZero: true, // Start Y-axis from zero
+            beginAtZero: true,
+            ticks: {
+              stepSize: 50, // Adjust step size for better readability
+            },
+          },
+        },
+        plugins: {
+          legend: {
+            display: false, // Hide legend for simplicity
           },
         },
       },
@@ -57,15 +128,16 @@ app.post('/generate-graph', (req, res) => {
 
     // Convert the chart to a PNG image
     const imageBuffer = canvas.toBuffer('image/png');
-
-    // Send the image as a response
     res.set('Content-Type', 'image/png');
     res.send(imageBuffer);
   } catch (error) {
     console.error('Error generating graph:', error);
-    res.status(500).json({ error: 'Failed to generate graph. Please check the server logs.' });
+    res.status(500).json({ error: 'Failed to generate graph.' });
   }
 });
 
 // Start the server
-const PORT = process
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});

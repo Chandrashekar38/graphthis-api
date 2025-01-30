@@ -12,11 +12,6 @@
     h1 {
       color: #333;
     }
-    pre {
-      background: #f4f4f4;
-      padding: 10px;
-      border-radius: 5px;
-    }
     form {
       margin-top: 20px;
     }
@@ -32,53 +27,38 @@
     }
     #graphContainer {
       margin-top: 20px;
+      text-align: center;
     }
     #downloadButton {
-      display: none; /* Hidden by default */
+      display: none;
       margin-top: 10px;
+    }
+    #graphImage {
+      max-width: 100%;
+      height: auto;
     }
   </style>
 </head>
 <body>
   <h1>Welcome to GraphThis API</h1>
-  <p>Enter unstructured data (e.g., "January 10, February 20, March 30") to generate a graph.</p>
-
+  <p>Enter data in any format (CSV, JSON, Key-Value Pairs) or upload a file.</p>
   <form id="graphForm">
     <label for="data">Enter Data:</label>
-    <textarea id="data" name="data" rows="4" placeholder="e.g., January 10, February 20, March 30" required></textarea>
-
+    <textarea id="data" name="data" rows="4" placeholder='e.g., "Jan 120, Feb 150" or {"Jan": 120, "Feb": 150}' required></textarea>
+    <label for="fileInput">Or Upload a File:</label>
+    <input type="file" id="fileInput" accept=".csv,.json,.txt">
     <label for="type">Chart Type:</label>
     <select id="type" name="type">
       <option value="line">Line</option>
       <option value="bar">Bar</option>
       <option value="pie">Pie</option>
     </select>
-
     <button type="submit">Generate Graph</button>
   </form>
-
   <div id="graphContainer"></div>
   <button id="downloadButton" onclick="downloadGraph()">Download Graph</button>
-
   <script>
-    let imageUrl = null; // To store the generated graph image URL
-
-    // Function to parse unstructured data into labels and data
-    function parseUnstructuredData(input) {
-      const pairs = input.split(',').map(pair => pair.trim());
-      const labels = [];
-      const data = [];
-
-      pairs.forEach(pair => {
-        const [label, value] = pair.split(/\s+/); // Split by whitespace
-        if (label && !isNaN(value)) {
-          labels.push(label);
-          data.push(Number(value));
-        }
-      });
-
-      return { labels, data };
-    }
+    let imageUrl = null;
 
     // Function to download the graph
     function downloadGraph() {
@@ -97,14 +77,19 @@
       e.preventDefault();
 
       const inputData = document.getElementById('data').value;
+      const fileInput = document.getElementById('fileInput').files[0];
       const type = document.getElementById('type').value;
 
-      // Parse unstructured data
-      const { labels, data } = parseUnstructuredData(inputData);
+      let rawData = inputData; // Default to text input
 
-      if (labels.length === 0 || data.length === 0) {
-        alert('Invalid input. Please enter data in the format "Label Value, Label Value, ..."');
-        return;
+      // If a file is uploaded, read its content
+      if (fileInput) {
+        const reader = new FileReader();
+        rawData = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsText(fileInput);
+        });
       }
 
       try {
@@ -113,7 +98,7 @@
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ labels, data, type }),
+          body: JSON.stringify({ data: rawData, type }),
         });
 
         if (!response.ok) {
@@ -126,6 +111,7 @@
 
         // Display the graph
         const img = document.createElement('img');
+        img.id = 'graphImage';
         img.src = imageUrl;
         document.getElementById('graphContainer').innerHTML = '';
         document.getElementById('graphContainer').appendChild(img);
